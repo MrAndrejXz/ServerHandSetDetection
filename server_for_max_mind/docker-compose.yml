@@ -1,0 +1,49 @@
+version: '2.1' 
+
+services:
+  server_max_mind:
+    image: server_max_mind
+    restart: always
+    network_mode: host
+    labels:
+      - autoheal=true
+    healthcheck:
+      test: ["CMD-SHELL", "[ $$(curl -s localhost:8777/status | grep \"service.status:ok\") ]"]
+      interval: 5s
+      timeout: 1s
+      retries: 30
+    volumes:
+      - ./config.json:/usr/src/app/server/config.json
+    depends_on:
+      mysql:
+        condition: service_healthy
+  
+  mysql:
+    image: mysql
+    network_mode: host
+    restart: always
+    labels:
+      - autoheal=true
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=mysql_for_server
+      - MYSQL_USER=nativeuser
+      - MYSQL_PASSWORD=123456789
+      - MYSQL_TCP_PORT=3310
+    command: --default-authentication-plugin=mysql_native_password
+    volumes:
+        - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+        - ./mysql_data:/var/lib/mysql
+    healthcheck:
+        test: "/usr/bin/mysql --user=root --password=root --execute \"SHOW DATABASES;\""
+        interval: 5s
+        timeout: 5s
+        retries: 30
+  
+  authoheal:
+    restart: always
+    image: willfarrell/autoheal
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=autoheal
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
